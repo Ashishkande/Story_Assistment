@@ -5,6 +5,9 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends libpq-dev gcc \
     && rm -rf /var/lib/apt/lists/*
 
+# Upgrade Python build/install tooling
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
 COPY pyproject.toml README.md alembic.ini ./
 COPY app ./app
 COPY cli ./cli
