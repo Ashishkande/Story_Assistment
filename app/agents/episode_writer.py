@@ -23,13 +23,18 @@ Write gripping, emotionally resonant episodes in a serialized format.
 
 STRICT RULES:
 1. Each episode must strictly be {min_words}–{max_words} words of actual story prose. Do NOT exceed {max_words} words under any circumstances.
-2. End every episode with an immediate, escalating cliffhanger or hook: The final 1–2 sentences must place a character in direct physical or psychological danger, reveal a shocking clue, or force an urgent dilemma matching the episode plan. Avoid passive, reflective, or atmospheric endings.
+2. End every episode with an immediate, escalating cliffhanger or hook:
+   - The final 1–2 sentences must place a character in direct physical or psychological danger, reveal an alarming clue, or present an urgent dilemma matching the episode plan.
+   - Do NOT end on a passive dialogue warning (e.g. a character simply saying 'be careful' or 'you are getting too close to danger'). The danger or threat must be actively happening, arriving, or confronting the protagonist right in the closing moment.
 3. Follow the provided episode plan and context EXACTLY.
 4. Maintain character consistency – personalities, goals, relationships do NOT change arbitrarily.
 5. Respect ALL human instructions in the context.
 6. Do not contradict established world facts or timeline.
 7. Advance at least one open story thread.
-8. STRICT NO-REPETITION: Do not recycle generic atmospheric sensations (e.g. 'feeling watched', 'eyes in the dark', 'a sudden chill') without significant new plot developments. Every episode must advance the story through new physical actions, dialogue, revelations, or confrontations.
+8. STRICT NO-REPETITION:
+   - Do NOT use repetitive cliché phrases such as 'dark path', 'slippery slope', or 'chill down the spine'.
+   - Do NOT repeat generic atmospheric concepts like 'feeling watched' or 'eyes in the dark' without significant, concrete new plot development.
+   - Every episode must advance the story through new physical actions, new clues, dialogue revelations, or direct confrontations.
 
 Return ONLY valid JSON with no text outside the JSON block."""
 
@@ -144,12 +149,22 @@ CONTEXT (for reference):
 
 SPECIFIC INSTRUCTIONS FOR FIXING CRITIC ISSUES:
 1. WORD COUNT OVERAGE: If an issue indicates word count exceeds a limit (e.g. over 500 words), you MUST aggressively cut filler, condense sentences, and tighten pacing so the revised prose is strictly within the allowed range.
-2. WEAK HOOK / LACK OF DANGER: If the hook was flagged as weak or not connected to danger, rewrite the final 2–3 sentences of the episode with an active cliffhanger of direct jeopardy, an alarming revelation, or an immediate threat.
-3. REPETITION: If repeated themes (such as 'being watched' or generic dread) were flagged, remove the repetitive sensory clichés and introduce a brand new clue, a physical confrontation, or dialogue action that moves the mystery forward.
+2. WEAK HOOK / LACK OF DANGER: If the hook was flagged as weak or not connected to danger, rewrite the final 2–3 sentences of the episode with an active cliffhanger of direct jeopardy, an alarming revelation, or an immediate threat. Do NOT end with passive dialogue warnings.
+3. REPETITION: If repeated themes (such as 'dark path', 'being watched', or generic dread) were flagged, remove the repetitive sensory clichés and introduce a brand new clue, a physical confrontation, or dialogue action that moves the mystery forward.
 4. HUMAN INSTRUCTIONS: Ensure every directive under Human Instructions is strictly honored.
 
-Fix ALL listed issues while keeping the story gripping and coherent.
-Return the revised episode in the exact same JSON format as before."""
+Return the revised episode as valid JSON with this exact structure:
+{{
+  "episode_number": {episode_number},
+  "title": "Episode title",
+  "content": "Full revised prose text",
+  "summary": "2-3 sentence summary",
+  "characters_present": ["Name1", "Name2"],
+  "facts_introduced": ["fact 1"],
+  "threads_opened": ["new thread opened"],
+  "threads_resolved": ["thread resolved"],
+  "hook": "The specific cliffhanger sentence ending the episode"
+}}"""
 
 
 class EpisodeWriterAgent:
@@ -208,6 +223,18 @@ class EpisodeWriterAgent:
                 f"[EpisodeWriter] Episode {ep_num} parsed with 0 words. "
                 f"Raw response starts: {(content or '')[:300]!r}"
             )
+        if not episode_output.characters_present and context:
+            plan_chars = context.episode_plan.get("characters_involved") or []
+            if plan_chars:
+                episode_output.characters_present = [str(c) for c in plan_chars if c]
+            elif context.relevant_characters:
+                found = [
+                    c["name"] for c in context.relevant_characters
+                    if c.get("name") and c["name"].lower() in episode_output.content.lower()
+                ]
+                if found:
+                    episode_output.characters_present = found
+
         logger.info(f"[EpisodeWriter] Episode {ep_num} written. words={episode_output.word_count}")
         return episode_output, meta
 
@@ -257,6 +284,29 @@ Human instructions: {'; '.join(context.active_instructions) if context.active_in
                 f"for episode {original.episode_number}"
             )
             episode_output = original
+
+        # Carry over metadata from original if missing in revision
+        if not episode_output.characters_present and original.characters_present:
+            episode_output.characters_present = original.characters_present
+        elif not episode_output.characters_present and context:
+            plan_chars = context.episode_plan.get("characters_involved") or []
+            if plan_chars:
+                episode_output.characters_present = [str(c) for c in plan_chars if c]
+            elif context.relevant_characters:
+                found = [
+                    c["name"] for c in context.relevant_characters
+                    if c.get("name") and c["name"].lower() in episode_output.content.lower()
+                ]
+                if found:
+                    episode_output.characters_present = found
+
+        if not episode_output.threads_opened and original.threads_opened:
+            episode_output.threads_opened = original.threads_opened
+        if not episode_output.threads_resolved and original.threads_resolved:
+            episode_output.threads_resolved = original.threads_resolved
+        if not episode_output.facts_introduced and original.facts_introduced:
+            episode_output.facts_introduced = original.facts_introduced
+
         logger.info(
             f"[EpisodeWriter] Revision complete for episode {original.episode_number}. "
             f"words={episode_output.word_count}"
@@ -271,15 +321,43 @@ Human instructions: {'; '.join(context.active_instructions) if context.active_in
         title = _as_prose(data.get("title")) or f"Episode {episode_number}"
         hook = _as_prose(data.get("hook"))
         hook = _closing_hook(content, hook)
+
+        chars_raw = (
+            data.get("characters_present")
+            or data.get("characters")
+            or data.get("characters_involved")
+            or data.get("cast")
+            or []
+        )
+        facts_raw = (
+            data.get("facts_introduced")
+            or data.get("new_facts")
+            or data.get("facts")
+            or []
+        )
+        threads_op_raw = (
+            data.get("threads_opened")
+            or data.get("open_threads")
+            or data.get("new_threads")
+            or data.get("threads")
+            or []
+        )
+        threads_res_raw = (
+            data.get("threads_resolved")
+            or data.get("resolved_threads")
+            or data.get("threads_closed")
+            or []
+        )
+
         return EpisodeOutput(
             episode_number=data.get("episode_number", episode_number),
             title=title,
             content=content,
             summary=_as_prose(data.get("summary")),
-            characters_present=_as_string_list(data.get("characters_present")),
-            facts_introduced=_as_string_list(data.get("facts_introduced")),
-            threads_opened=_as_string_list(data.get("threads_opened")),
-            threads_resolved=_as_string_list(data.get("threads_resolved")),
+            characters_present=_as_string_list(chars_raw),
+            facts_introduced=_as_string_list(facts_raw),
+            threads_opened=_as_string_list(threads_op_raw),
+            threads_resolved=_as_string_list(threads_res_raw),
             hook=hook,
             word_count=word_count,
         )
@@ -299,5 +377,13 @@ def _as_string_list(value: Any) -> list[str]:
     if isinstance(value, str):
         return [value] if value.strip() else []
     if isinstance(value, list):
-        return [str(item).strip() for item in value if str(item).strip()]
+        result = []
+        for item in value:
+            if isinstance(item, dict):
+                val = item.get("name") or item.get("title") or item.get("description") or ""
+                if val:
+                    result.append(str(val).strip())
+            elif item is not None and str(item).strip():
+                result.append(str(item).strip())
+        return result
     return []
