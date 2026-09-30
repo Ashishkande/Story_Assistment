@@ -29,7 +29,7 @@ services:
       APP_ENV: production
       DATABASE_URL: postgresql+asyncpg://story_user:story_pass@database:5432/story_db
       DATABASE_URL_SYNC: postgresql+psycopg2://story_user:story_pass@database:5432/story_db
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://3.110.55.88:3000}
     ports:
       - "8000:8000"
 
@@ -37,7 +37,7 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_URL=http://3.110.55.88:8000
+        VITE_API_URL: http://3.110.55.88:8000
     container_name: story_frontend
     depends_on:
       backend:
