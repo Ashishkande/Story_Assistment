@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+}
+
+html, body, #root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+html:not(.dark) body {
+  background: #f6f3ee;
+  color: #1c1917;
+}
+html:not(.dark) .bg-zinc-950,
+html:not(.dark) .bg-zinc-950\/90 {
+  background-color: #f6f3ee;
+}
+html:not(.dark) .bg-zinc-900,
+html:not(.dark) .bg-zinc-900\/70 {
+  background-color: #fff;
+}
+html:not(.dark) .text-zinc-100,
+html:not(.dark) .text-zinc-50,
+html:not(.dark) .text-zinc-200 {
+  color: #1c1917;
+}
+html:not(.dark) .text-zinc-300,
+html:not(.dark) .text-zinc-400,
+html:not(.dark) .text-zinc-500 {
+  color: #57534e;
+}
+html:not(.dark) .border-zinc-800,
+html:not(.dark) .border-zinc-700 {
+  border-color: #e7e5e4;
+}

@@ -1,0 +1,9 @@
+# DECISIONS
+
+**How does the system remember the story at episode 150?** It does not reload episodes 1–147. Context is layered: the 200-episode plan (this beat + current arc), a rolling summary of 1–149, the last three approved summaries/hooks, a one-line plot index of the last ~24 episodes (repetition), all character cards and world facts, open threads, and every active human instruction. Full prose is stored in Postgres and used only to update memory after approve/edit (truncated into the memory-updater prompt).
+
+**Where does the human step in, and why there?** Twice. (1) After the plan: one cheap gate before 200 outlines become canon. (2) After each episode draft (and critic/revise): approve, edit, reject, or leave a persistent instruction. We do not interrupt inside the LLM loop. Feedback is for the future (“slow the romance”), not a rewrite of the current file unless they Edit.
+
+**How do we detect inconsistency or repetition before a human?** Deterministic guards: empty prose, 400–700 word bounds, hook present and aligned with the ending, Jaccard overlap of the draft against prior plot beats. Then an LLM critic checks characters, facts, threads, plan hook, and whether instructions were followed. Fail → revise (max 2) unless the per-episode cost cap is hit, then human review with the issues attached.
+
+**What breaks first as the story grows, and how would we fix it?** The rolling summary and truncated fact/thread lists drop old detail; long-range echo beyond 24 beats can slip through. Fix: periodic “arc digest” rows, embeddings for beat search (`ENABLE_EMBEDDINGS`), and a human reconcile after a mid-history edit. Retroactive edit of episode 40 marks 41+ stale, resumes from the last *non-stale* approved episode, and `POST /stories/{id}/reconcile` makes that explicit so 41–60 are rewritten in order rather than skipped.

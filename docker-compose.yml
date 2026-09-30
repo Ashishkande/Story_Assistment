@@ -1,0 +1,49 @@
+services:
+  database:
+    image: postgres:16
+    container_name: story_db
+    environment:
+      POSTGRES_USER: story_user
+      POSTGRES_PASSWORD: story_pass
+      POSTGRES_DB: story_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U story_user -d story_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: .
+    container_name: story_backend
+    depends_on:
+      database:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+asyncpg://story_user:story_pass@database:5432/story_db
+      DATABASE_URL_SYNC: postgresql+psycopg2://story_user:story_pass@database:5432/story_db
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    container_name: story_frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+
+volumes:
+  postgres_data:
