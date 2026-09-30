@@ -22,14 +22,14 @@ WRITER_SYSTEM = """You are a master serial fiction writer.
 Write gripping, emotionally resonant episodes in a serialized format.
 
 STRICT RULES:
-1. Each episode must be {min_words}–{max_words} words of actual story prose.
-2. End every episode with a strong hook or cliffhanger.
+1. Each episode must strictly be {min_words}–{max_words} words of actual story prose. Do NOT exceed {max_words} words under any circumstances.
+2. End every episode with an immediate, escalating cliffhanger or hook: The final 1–2 sentences must place a character in direct physical or psychological danger, reveal a shocking clue, or force an urgent dilemma matching the episode plan. Avoid passive, reflective, or atmospheric endings.
 3. Follow the provided episode plan and context EXACTLY.
 4. Maintain character consistency – personalities, goals, relationships do NOT change arbitrarily.
 5. Respect ALL human instructions in the context.
 6. Do not contradict established world facts or timeline.
 7. Advance at least one open story thread.
-8. Avoid repeating events from recent episodes.
+8. STRICT NO-REPETITION: Do not recycle generic atmospheric sensations (e.g. 'feeling watched', 'eyes in the dark', 'a sudden chill') without significant new plot developments. Every episode must advance the story through new physical actions, dialogue, revelations, or confrontations.
 
 Return ONLY valid JSON with no text outside the JSON block."""
 
@@ -42,18 +42,18 @@ Generate the episode as JSON with this exact structure:
 {{
   "episode_number": {episode_number},
   "title": "Episode title (not just 'Episode N')",
-  "content": "Full episode prose text ({min_words}–{max_words} words)",
+  "content": "Full episode prose text (STRICTLY {min_words}–{max_words} words)",
   "summary": "2-3 sentence summary for memory storage",
   "characters_present": ["Name1", "Name2"],
   "facts_introduced": ["new fact 1", "new fact 2"],
   "threads_opened": ["new mystery or conflict opened"],
   "threads_resolved": ["thread that was resolved"],
-  "hook": "The specific cliffhanger/hook sentence that ends the episode"
+  "hook": "The specific cliffhanger/hook sentence that ends the episode, connecting directly to the impending danger, threat, or major revelation"
 }}
 
 IMPORTANT:
-- "content" must be complete prose fiction, {min_words}–{max_words} words.
-- "hook" must be 1-2 sentences matching the very end of "content".
+- "content" must be complete prose fiction, STRICTLY {min_words}–{max_words} words. Do NOT exceed {max_words} words.
+- "hook" must be 1-2 sentences matching the very end of "content" and must present clear, active danger or dramatic shock.
 - "summary" must be concise (2-3 sentences) for memory storage.
 - Do NOT put the same text in both "content" and "summary".
 - Return ONLY the JSON object, nothing else."""
@@ -142,8 +142,14 @@ ORIGINAL EPISODE:
 CONTEXT (for reference):
 {context_brief}
 
-Fix ALL listed issues while keeping the story coherent.
-Return the revised episode in the same JSON format as before."""
+SPECIFIC INSTRUCTIONS FOR FIXING CRITIC ISSUES:
+1. WORD COUNT OVERAGE: If an issue indicates word count exceeds a limit (e.g. over 500 words), you MUST aggressively cut filler, condense sentences, and tighten pacing so the revised prose is strictly within the allowed range.
+2. WEAK HOOK / LACK OF DANGER: If the hook was flagged as weak or not connected to danger, rewrite the final 2–3 sentences of the episode with an active cliffhanger of direct jeopardy, an alarming revelation, or an immediate threat.
+3. REPETITION: If repeated themes (such as 'being watched' or generic dread) were flagged, remove the repetitive sensory clichés and introduce a brand new clue, a physical confrontation, or dialogue action that moves the mystery forward.
+4. HUMAN INSTRUCTIONS: Ensure every directive under Human Instructions is strictly honored.
+
+Fix ALL listed issues while keeping the story gripping and coherent.
+Return the revised episode in the exact same JSON format as before."""
 
 
 class EpisodeWriterAgent:
@@ -174,16 +180,17 @@ class EpisodeWriterAgent:
         if rejection_reason:
             rejection_note = f"\n\nNOTE: A previous version was rejected for: {rejection_reason}\nDo NOT repeat that mistake.\n"
 
+        min_words, max_words = context.min_words, context.max_words
         prompt = WRITER_PROMPT.format(
             episode_number=ep_num,
             context=context_text + rejection_note,
-            min_words=self.settings.episode_min_words,
-            max_words=self.settings.episode_max_words,
+            min_words=min_words,
+            max_words=max_words,
         )
 
         system = WRITER_SYSTEM.format(
-            min_words=self.settings.episode_min_words,
-            max_words=self.settings.episode_max_words,
+            min_words=min_words,
+            max_words=max_words,
         )
 
         messages = [
@@ -222,6 +229,7 @@ class EpisodeWriterAgent:
 
         # Brief context for revision (no need to repeat everything)
         context_brief = f"""Story: {context.story_title}
+Word count target: {context.min_words}–{context.max_words} words
 Recent state: {context.rolling_summary[:300] if context.rolling_summary else 'N/A'}
 Human instructions: {'; '.join(context.active_instructions) if context.active_instructions else 'None'}"""
 
@@ -234,8 +242,8 @@ Human instructions: {'; '.join(context.active_instructions) if context.active_in
 
         messages = [
             SystemMessage(content=WRITER_SYSTEM.format(
-                min_words=self.settings.episode_min_words,
-                max_words=self.settings.episode_max_words,
+                min_words=context.min_words,
+                max_words=context.max_words,
             )),
             HumanMessage(content=prompt),
         ]
@@ -261,6 +269,8 @@ Human instructions: {'; '.join(context.active_instructions) if context.active_in
         content = _as_prose(next((data.get(key) for key in _CONTENT_KEYS if _as_prose(data.get(key))), ""))
         word_count = len(content.split()) if content else 0
         title = _as_prose(data.get("title")) or f"Episode {episode_number}"
+        hook = _as_prose(data.get("hook"))
+        hook = _closing_hook(content, hook)
         return EpisodeOutput(
             episode_number=data.get("episode_number", episode_number),
             title=title,
@@ -270,9 +280,17 @@ Human instructions: {'; '.join(context.active_instructions) if context.active_in
             facts_introduced=_as_string_list(data.get("facts_introduced")),
             threads_opened=_as_string_list(data.get("threads_opened")),
             threads_resolved=_as_string_list(data.get("threads_resolved")),
-            hook=_as_prose(data.get("hook")),
+            hook=hook,
             word_count=word_count,
         )
+
+
+def _closing_hook(content: str, hook: str) -> str:
+    """Preserve explicit hook, falling back to the closing sentences if empty."""
+    if hook and hook.strip():
+        return hook.strip()
+    sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", content.strip()) if part.strip()]
+    return " ".join(sentences[-2:]) if sentences else ""
 
 
 def _as_string_list(value: Any) -> list[str]:

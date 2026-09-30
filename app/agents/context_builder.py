@@ -14,6 +14,9 @@ from app.db.models import (
     HumanFeedback, MemorySummary, StoryPlan,
 )
 
+from app.agents.guards import parse_word_limits
+from app.config import get_settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -47,6 +50,9 @@ class EpisodeContext:
     # Compact plot index (last ~24 approved one-liners) for long-range repetition
     plot_beats: list[str] = field(default_factory=list)
 
+    min_words: int = 400
+    max_words: int = 700
+
     # Story metadata
     story_title: str = ""
     premise: str = ""
@@ -60,6 +66,7 @@ class EpisodeContext:
         parts.append(f"=== STORY: {self.story_title} ===")
         parts.append(f"Premise: {self.premise}")
         parts.append(f"Genre/Tone: {self.genre} / {self.tone}")
+        parts.append(f"WORD COUNT TARGET: {self.min_words}–{self.max_words} words of prose. Do not exceed {self.max_words}.")
         parts.append("")
 
         if self.current_arc:
@@ -266,8 +273,15 @@ class ContextBuilder:
 
         # Human instructions
         ctx.active_instructions = [
-            fb.instruction for fb in active_instructions if fb.instruction
+            fb.instruction for fb in active_instructions
+            if fb.instruction and fb.instruction.strip().lower() not in {"generate the context", "generate context"}
         ]
+        settings = get_settings()
+        ctx.min_words, ctx.max_words = parse_word_limits(
+            ctx.active_instructions,
+            settings.episode_min_words,
+            settings.episode_max_words,
+        )
 
         logger.debug(
             f"[ContextBuilder] Episode {episode_number}: "

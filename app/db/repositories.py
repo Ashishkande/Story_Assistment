@@ -464,7 +464,23 @@ class FeedbackRepo:
         )
         return list(result.scalars().all())
 
-    async def get_all(self, story_id: str) -> list[HumanFeedback]:
+    async def deactivate(self, feedback_id: str) -> Optional[HumanFeedback]:
+        await self.db.execute(
+            update(HumanFeedback).where(HumanFeedback.id == feedback_id).values(is_active=False)
+        )
+        await self.db.commit()
+        return await self.db.get(HumanFeedback, feedback_id)
+
+    async def deactivate_word_count_instructions(self, story_id: str, keep_id: str) -> int:
+        from app.agents.guards import is_word_count_instruction
+        rows = await self.get_active_instructions(story_id)
+        count = 0
+        for row in rows:
+            if row.id == keep_id or not is_word_count_instruction(row.instruction or ""):
+                continue
+            await self.deactivate(row.id)
+            count += 1
+        return count
         result = await self.db.execute(
             select(HumanFeedback).where(HumanFeedback.story_id == story_id).order_by(HumanFeedback.created_at)
         )
