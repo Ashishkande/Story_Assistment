@@ -41,6 +41,15 @@ async def get_story(story_id: str, svc: StoryService = Depends(get_service)):
     return story
 
 
+@router.delete("/{story_id}")
+async def delete_story(story_id: str, svc: StoryService = Depends(get_service)):
+    """Delete a story and cascade-delete all related data."""
+    try:
+        return await svc.delete_story(story_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 # ─── Plan ────────────────────────────────────────────────
 
 @router.post("/{story_id}/plan")

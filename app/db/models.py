@@ -118,14 +118,14 @@ class Story(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
-    plan: Mapped[StoryPlan | None] = relationship("StoryPlan", back_populates="story", uselist=False)
-    episodes: Mapped[list[Episode]] = relationship("Episode", back_populates="story", order_by="Episode.episode_number")
-    characters: Mapped[list[Character]] = relationship("Character", back_populates="story")
-    world_facts: Mapped[list[WorldFact]] = relationship("WorldFact", back_populates="story")
-    open_threads: Mapped[list[OpenThread]] = relationship("OpenThread", back_populates="story")
-    human_feedback: Mapped[list[HumanFeedback]] = relationship("HumanFeedback", back_populates="story")
-    memory_summaries: Mapped[list[MemorySummary]] = relationship("MemorySummary", back_populates="story")
-    agent_runs: Mapped[list[AgentRun]] = relationship("AgentRun", back_populates="story")
+    plan: Mapped[StoryPlan | None] = relationship("StoryPlan", back_populates="story", uselist=False, cascade="all, delete-orphan", passive_deletes=True)
+    episodes: Mapped[list[Episode]] = relationship("Episode", back_populates="story", order_by="Episode.episode_number", cascade="all, delete-orphan", passive_deletes=True)
+    characters: Mapped[list[Character]] = relationship("Character", back_populates="story", cascade="all, delete-orphan", passive_deletes=True)
+    world_facts: Mapped[list[WorldFact]] = relationship("WorldFact", back_populates="story", cascade="all, delete-orphan", passive_deletes=True)
+    open_threads: Mapped[list[OpenThread]] = relationship("OpenThread", back_populates="story", cascade="all, delete-orphan", passive_deletes=True)
+    human_feedback: Mapped[list[HumanFeedback]] = relationship("HumanFeedback", back_populates="story", cascade="all, delete-orphan", passive_deletes=True)
+    memory_summaries: Mapped[list[MemorySummary]] = relationship("MemorySummary", back_populates="story", cascade="all, delete-orphan", passive_deletes=True)
+    agent_runs: Mapped[list[AgentRun]] = relationship("AgentRun", back_populates="story", cascade="all, delete-orphan", passive_deletes=True)
 
     __table_args__ = (Index("ix_stories_status", "status"),)
 

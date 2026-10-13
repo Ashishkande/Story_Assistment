@@ -1,16 +1,30 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getDashboard } from "../api/stories";
+import { Trash2 } from "lucide-react";
+import { deleteStory, getDashboard } from "../api/stories";
 import { apiError } from "../api/client";
-import type { DashboardData } from "../types";
+import type { DashboardData, Story } from "../types";
 import { CreateStoryModal } from "../components/CreateStoryModal";
-import { EmptyState, ErrorState, LoadingBlock, StatusBadge, buttonClass, ghostButton } from "../components/ui";
+import { useToast } from "../hooks/useToast";
+import {
+  EmptyState,
+  ErrorState,
+  LoadingBlock,
+  Modal,
+  StatusBadge,
+  buttonClass,
+  dangerButton,
+  ghostButton,
+} from "../components/ui";
 
 export function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [storyToDelete, setStoryToDelete] = useState<Story | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const { push } = useToast();
 
   function load() {
     setLoading(true);
@@ -22,6 +36,21 @@ export function DashboardPage() {
   }
 
   useEffect(load, []);
+
+  async function confirmDeleteStory() {
+    if (!storyToDelete) return;
+    setDeleting(true);
+    try {
+      await deleteStory(storyToDelete.id);
+      push("Story deleted successfully.");
+      setStoryToDelete(null);
+      load();
+    } catch (err) {
+      push(apiError(err), "error");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -74,7 +103,17 @@ export function DashboardPage() {
                         </Link>
                         <p className="text-sm text-zinc-400">{story.premise}</p>
                       </div>
-                      <StatusBadge status={story.status} />
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status={story.status} />
+                        <button
+                          type="button"
+                          title="Delete story"
+                          onClick={() => setStoryToDelete(story)}
+                          className="rounded p-1 text-zinc-500 transition hover:bg-rose-950/60 hover:text-rose-400"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -98,7 +137,36 @@ export function DashboardPage() {
           )}
         </>
       ) : null}
-      {creating ? <CreateStoryModal onClose={() => setCreating(false)} /> : null}
+      {creating ? <CreateStoryModal onClose={() => { setCreating(false); load(); }} /> : null}
+
+      {storyToDelete ? (
+        <Modal title="Delete Story" onClose={() => !deleting && setStoryToDelete(null)}>
+          <div className="space-y-4">
+            <p className="text-sm text-zinc-300">
+              Are you sure you want to delete <strong className="text-zinc-100">{storyToDelete.title || "this story"}</strong>?
+            </p>
+            <p className="rounded-lg border border-rose-900/50 bg-rose-950/30 p-3 text-xs text-rose-300">
+              This will permanently delete the story and all associated data (episodes, plans, memory, and logs). This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                className={ghostButton}
+                disabled={deleting}
+                onClick={() => setStoryToDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className={dangerButton}
+                disabled={deleting}
+                onClick={confirmDeleteStory}
+              >
+                {deleting ? "Deleting..." : "Permanently Delete"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   );
 }

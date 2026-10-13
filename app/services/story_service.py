@@ -91,6 +91,13 @@ class StoryService:
             for s in stories
         ]
 
+    async def delete_story(self, story_id: str) -> dict:
+        story = await self.stories.get(story_id)
+        if not story:
+            raise ValueError(f"Story {story_id} not found")
+        await self.stories.delete(story_id)
+        return {"status": "deleted", "story_id": story_id}
+
     # ─── Plan generation ─────────────────────────────
 
     async def generate_plan(self, story_id: str) -> dict:

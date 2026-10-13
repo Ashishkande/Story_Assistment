@@ -53,6 +53,20 @@ class StoryRepo:
     async def set_status(self, story_id: str, status: str) -> None:
         await self.update(story_id, status=status)
 
+    async def delete(self, story_id: str) -> bool:
+        """Delete story and cascade-delete all related records."""
+        await self.db.execute(delete(AgentRun).where(AgentRun.story_id == story_id))
+        await self.db.execute(delete(MemorySummary).where(MemorySummary.story_id == story_id))
+        await self.db.execute(delete(HumanFeedback).where(HumanFeedback.story_id == story_id))
+        await self.db.execute(delete(OpenThread).where(OpenThread.story_id == story_id))
+        await self.db.execute(delete(WorldFact).where(WorldFact.story_id == story_id))
+        await self.db.execute(delete(Character).where(Character.story_id == story_id))
+        await self.db.execute(delete(Episode).where(Episode.story_id == story_id))
+        await self.db.execute(delete(StoryPlan).where(StoryPlan.story_id == story_id))
+        result = await self.db.execute(delete(Story).where(Story.id == story_id))
+        await self.db.commit()
+        return bool(result.rowcount and result.rowcount > 0)
+
 
 class StorySyncRepo:
     """Sync version for CLI / scripts."""
@@ -69,6 +83,20 @@ class StorySyncRepo:
         self.db.execute(update(Story).where(Story.id == story_id).values(**kwargs, updated_at=_utcnow()))
         self.db.commit()
         return self.get(story_id)
+
+    def delete(self, story_id: str) -> bool:
+        """Delete story and cascade-delete all related records."""
+        self.db.execute(delete(AgentRun).where(AgentRun.story_id == story_id))
+        self.db.execute(delete(MemorySummary).where(MemorySummary.story_id == story_id))
+        self.db.execute(delete(HumanFeedback).where(HumanFeedback.story_id == story_id))
+        self.db.execute(delete(OpenThread).where(OpenThread.story_id == story_id))
+        self.db.execute(delete(WorldFact).where(WorldFact.story_id == story_id))
+        self.db.execute(delete(Character).where(Character.story_id == story_id))
+        self.db.execute(delete(Episode).where(Episode.story_id == story_id))
+        self.db.execute(delete(StoryPlan).where(StoryPlan.story_id == story_id))
+        result = self.db.execute(delete(Story).where(Story.id == story_id))
+        self.db.commit()
+        return bool(result.rowcount and result.rowcount > 0)
 
 
 # ─────────────────────────────────────────────

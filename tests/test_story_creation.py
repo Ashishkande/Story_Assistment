@@ -72,3 +72,32 @@ class TestStoryCreation:
         assert repo.get(sample_story.id).status == StoryStatus.PLAN_PENDING_REVIEW
         repo.update(sample_story.id, status=StoryStatus.ACTIVE)
         assert repo.get(sample_story.id).status == StoryStatus.ACTIVE
+
+    def test_story_repo_delete_cascade(self, db: Session, sample_story: Story, approved_plan):
+        """Deleting a story deletes the story and cascades to plans and episodes."""
+        from app.db.models import Episode, EpisodeStatus
+        episode = Episode(
+            id=str(uuid.uuid4()),
+            story_id=sample_story.id,
+            episode_number=1,
+            title="Episode 1",
+            content="Dark night on the street.",
+            status=EpisodeStatus.APPROVED,
+        )
+        db.add(episode)
+        db.commit()
+
+        repo = StorySyncRepo(db)
+        story_id = sample_story.id
+
+        assert repo.get(story_id) is not None
+        assert PlanSyncRepo(db).get(story_id) is not None
+        assert EpisodeSyncRepo(db).get(story_id, 1) is not None
+
+        deleted = repo.delete(story_id)
+        assert deleted is True
+
+        assert repo.get(story_id) is None
+        assert PlanSyncRepo(db).get(story_id) is None
+        assert EpisodeSyncRepo(db).get(story_id, 1) is None
+        assert story_id not in [s.id for s in repo.list_all()]

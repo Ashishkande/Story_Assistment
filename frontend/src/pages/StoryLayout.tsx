@@ -1,11 +1,21 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
-import { getStory, resumeStory } from "../api/stories";
+import { Trash2 } from "lucide-react";
+import { deleteStory, getStory, resumeStory } from "../api/stories";
 import { apiError } from "../api/client";
 import { startOperation, waitForOperation } from "../api/logs";
 import type { Story } from "../types";
 import { useToast } from "../hooks/useToast";
-import { ErrorState, LoadingBlock, StatusBadge, buttonClass, ghostButton } from "../components/ui";
+import {
+  ErrorState,
+  LoadingBlock,
+  Modal,
+  StatusBadge,
+  buttonClass,
+  dangerButton,
+  ghostButton,
+  ghostDangerButton,
+} from "../components/ui";
 
 const tabs = [
   ["", "Overview"],
@@ -25,6 +35,8 @@ export function StoryLayout() {
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState("");
   const [jobKind, setJobKind] = useState<"plan" | "episode" | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   function load() {
     setLoading(true);
@@ -64,8 +76,33 @@ export function StoryLayout() {
     }
   }
 
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      await deleteStory(storyId);
+      push("Story deleted successfully.");
+      setConfirmDelete(false);
+      setStory(null);
+      navigate("/stories", { replace: true });
+    } catch (err) {
+      push(apiError(err), "error");
+      setDeleting(false);
+    }
+  }
+
   if (loading) return <LoadingBlock label="Loading story..." />;
-  if (error || !story) return <ErrorState message={error || "Story not found"} onRetry={load} />;
+  if (error || !story) {
+    return (
+      <div className="space-y-4">
+        <ErrorState message={error || "Story not found"} onRetry={load} />
+        <div className="text-center">
+          <button className={ghostButton} onClick={() => navigate("/stories")}>
+            &larr; Back to all stories
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -81,17 +118,59 @@ export function StoryLayout() {
         <p className="mt-4 text-sm text-zinc-300">
           Episode {story.current_episode} / {story.total_planned || 200}
         </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button className={buttonClass} disabled={!!working} onClick={() => run("episode", "Generating episode...")}>
-            {jobKind === "episode" ? working : "Generate Next Episode"}
-          </button>
-          <button className={ghostButton} disabled={!!working} onClick={resume}>Resume</button>
-          <button className={ghostButton} disabled={!!working} onClick={() => run("plan", "Generating 200-episode plan...")}>
-            {jobKind === "plan" ? working : "Generate Plan"}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-2">
+            <button className={buttonClass} disabled={!!working || deleting} onClick={() => run("episode", "Generating episode...")}>
+              {jobKind === "episode" ? working : "Generate Next Episode"}
+            </button>
+            <button className={ghostButton} disabled={!!working || deleting} onClick={resume}>Resume</button>
+            <button className={ghostButton} disabled={!!working || deleting} onClick={() => run("plan", "Generating 200-episode plan...")}>
+              {jobKind === "plan" ? working : "Generate Plan"}
+            </button>
+          </div>
+          <button
+            className={ghostDangerButton}
+            disabled={!!working || deleting}
+            onClick={() => setConfirmDelete(true)}
+            title="Delete this story"
+          >
+            <span className="flex items-center gap-1.5">
+              <Trash2 size={15} />
+              Delete Story
+            </span>
           </button>
         </div>
         {working ? <p className="mt-3 text-sm text-amber-200">Agent is working... {working}</p> : null}
       </header>
+
+      {confirmDelete ? (
+        <Modal title="Delete Story" onClose={() => !deleting && setConfirmDelete(false)}>
+          <div className="space-y-4">
+            <p className="text-sm text-zinc-300">
+              Are you sure you want to delete <strong className="text-zinc-100">{story.title || "this story"}</strong>?
+            </p>
+            <p className="rounded-lg border border-rose-900/50 bg-rose-950/30 p-3 text-xs text-rose-300">
+              This will permanently delete the story and all associated data (episodes, plans, characters, facts, threads, feedback, and logs). This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                className={ghostButton}
+                disabled={deleting}
+                onClick={() => setConfirmDelete(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className={dangerButton}
+                disabled={deleting}
+                onClick={handleDelete}
+              >
+                {deleting ? "Deleting..." : "Permanently Delete"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
       <nav className="flex flex-wrap gap-2">
         {tabs.map(([path, label]) => (
           <NavLink

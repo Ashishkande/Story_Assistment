@@ -108,3 +108,9 @@ export const buttonClass =
 
 export const ghostButton =
   "rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800 disabled:opacity-50";
+
+export const dangerButton =
+  "rounded-lg border border-rose-800 bg-rose-950/60 px-3 py-2 text-sm font-medium text-rose-300 hover:bg-rose-900/80 disabled:cursor-not-allowed disabled:opacity-50";
+
+export const ghostDangerButton =
+  "rounded-lg border border-zinc-800 px-3 py-2 text-sm text-rose-400 hover:border-rose-800/60 hover:bg-rose-950/40 disabled:cursor-not-allowed disabled:opacity-50";

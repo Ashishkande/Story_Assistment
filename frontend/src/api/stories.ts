@@ -30,3 +30,8 @@ export async function reconcileStory(storyId: string, fromEpisode: number) {
   const { data } = await http.post(`/api/stories/${storyId}/reconcile`, { from_episode: fromEpisode });
   return data;
 }
+
+export async function deleteStory(storyId: string) {
+  const { data } = await http.delete<{ status: string; story_id: string }>(`/api/stories/${storyId}`);
+  return data;
+}
