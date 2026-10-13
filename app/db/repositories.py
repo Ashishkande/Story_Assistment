@@ -481,6 +481,8 @@ class FeedbackRepo:
             await self.deactivate(row.id)
             count += 1
         return count
+
+    async def get_all(self, story_id: str) -> list[HumanFeedback]:
         result = await self.db.execute(
             select(HumanFeedback).where(HumanFeedback.story_id == story_id).order_by(HumanFeedback.created_at)
         )
